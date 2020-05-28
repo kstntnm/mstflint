@@ -44,7 +44,7 @@
 #ifdef CABLES_SUPP
 #include <cable_access/cable_access.h>
 #endif
-
+#include <fw_comps_mgr/fw_comps_mgr.h>
 typedef f_prog_func_str VerifyCallBack;
 typedef f_prog_func ProgressCallBack;
 typedef f_prog_func_ex ProgressCallBackEx;
@@ -57,7 +57,6 @@ typedef int (*PrintCallBackAdv) (int completion, char *str);
 extern bool nextBootFwVer;
 #define GLOBAL_ALIGNMENT 0x80
 class MLXFWOP_API FwOperations : public FlintErrMsg {
-
 
 public:
     #define EXP_ROM_GEN_DEVID 0
@@ -144,7 +143,7 @@ public:
 
     virtual bool FwBurn(FwOperations *imageOps, u_int8_t forceVersion, ProgressCallBack progressFunc = (ProgressCallBack)NULL) = 0;
     virtual bool FwBurnAdvanced(FwOperations *imageOps, ExtBurnParams& burnParams) = 0;
-    virtual bool FwBurnAdvanced(std::vector <u_int8_t> imageOps4MData, ExtBurnParams& burnParams);
+    virtual bool FwBurnAdvanced(std::vector <u_int8_t> imageOps4MData, ExtBurnParams& burnParams, FwComponent::comps_ids_t ComponentId = FwComponent::COMPID_BOOT_IMG);
     virtual bool FwBurnBlock(FwOperations *imageOps, ProgressCallBack progressFunc) = 0; //Add: callback progress, question arr, callback question, configurations
     virtual bool FwWriteBlock(u_int32_t addr, std::vector<u_int8_t> dataVec, ProgressCallBack progressFunc = (ProgressCallBack)NULL);
 
@@ -211,6 +210,7 @@ public:
 
     //bool GetExpRomVersionWrapper();
     void getSupporteHwId(u_int32_t **supportedHwId, u_int32_t &supportedHwIdNum);
+
     static FwVersion createFwVersion(const fw_info_com_t*);
     static FwVersion createFwVersion(u_int16_t fw_ver0, u_int16_t fw_ver1, u_int16_t fw_ver2);
     static FwVersion createRunningFwVersion(const fw_info_com_t*);
@@ -505,7 +505,6 @@ public:
     std::vector<u_int8_t> _fwConfSect;
     std::vector<u_int8_t> _hashFileSect;
     std::vector<u_int8_t> _readSectList;
-
     bool _sectionsToRead[H_LAST];
     bool _wasVerified;
     bool _quickQuery;

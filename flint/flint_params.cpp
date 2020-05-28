@@ -96,6 +96,7 @@ FlintParams::FlintParams()
     num_of_args = 0;
     use_latest_fw_version = false;
     use_psid = false;
+    congestion_control = false;
 }
 
 FlintParams::~FlintParams()

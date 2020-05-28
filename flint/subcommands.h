@@ -154,7 +154,7 @@ protected:
     inline void closeLog() {close_log();}
     //print errors to an err buff, log if needed and stdout
     void reportErr(bool shouldPrint, const char *format, ...);
-
+    bool readFromFile(string filePath, std::vector<u_int8_t>& buff);
     bool writeToFile(string filePath, const std::vector<u_int8_t>& buff);
     FlintStatus writeImageToFile(const char *file_name, u_int8_t *data, u_int32_t length);
 
@@ -204,6 +204,7 @@ private:
     bool dealWithVSD();
     FlintStatus burnMFA2();
     FlintStatus burnMFA2LiveFish(dm_dev_id_t devid_t);
+    FlintStatus burnCongestionControl();
     bool verifyMFA2Params(bool IsLiveFish);
 public:
     BurnSubCommand();

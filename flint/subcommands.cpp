@@ -261,6 +261,23 @@ void SubCommand::reportErr(bool shouldPrint, const char *format, ...)
     return;
 }
 
+bool SubCommand::readFromFile(string filePath, std::vector<u_int8_t>& buff)
+{
+    FILE *fh = fopen(filePath.c_str(), "rb");
+    if (fh == NULL) {
+        reportErr(true, FLINT_OPEN_FILE_ERROR, filePath.c_str(), strerror(errno));
+        return false;
+    }
+    // Write
+    if (fread(&buff[0], 1, buff.size(), fh) != buff.size()) {
+        fclose(fh);
+        reportErr(true, FLINT_WRITE_FILE_ERROR, filePath.c_str(), strerror(errno));
+        return false;
+    }
+    fclose(fh);
+    return true;
+}
+
 bool SubCommand::writeToFile(string filePath, const std::vector<u_int8_t>& buff)
 {
     FILE *fh = fopen(filePath.c_str(), "wb");
@@ -625,7 +642,7 @@ FlintStatus SubCommand::preFwOps(bool ignoreSecurityAttributes, bool ignoreDToc)
     if (!verifyParams()) {
         return FLINT_FAILED;
     }
-    if (_flintParams.mfa2_specified) {
+    if (_flintParams.mfa2_specified || _flintParams.congestion_control) {
         bool saved_value = _flintParams.image_specified;
         _flintParams.image_specified = false;
         FlintStatus result = openOps(true);
@@ -2346,6 +2363,9 @@ FlintStatus BurnSubCommand::executeCommand()
             return burnMFA2();
         }
     }
+    else if (_flintParams.congestion_control) {
+        return burnCongestionControl();
+    }
     else {
         if (preFwOps() == FLINT_FAILED) {
             return FLINT_FAILED;
@@ -2550,6 +2570,37 @@ FlintStatus BurnSubCommand::burnMFA2LiveFish(dm_dev_id_t devid_t)
     return FLINT_FAILED;
 #endif
 }
+
+FlintStatus BurnSubCommand::burnCongestionControl()
+{
+    if (preFwOps() == FLINT_FAILED) {
+        return FLINT_FAILED;
+    }
+    if (!_fwOps->FwQuery(&_devInfo)) {
+        reportErr(true, FLINT_FAILED_QUERY_ERROR, "Device", _flintParams.device.c_str(), _fwOps->err());
+        return FLINT_FAILED;
+    }
+    bool is_fw_ctrl = _fwOps->IsFsCtrlOperations();
+    if (!is_fw_ctrl) {
+        reportErr(true, "Burning CongestionControl is not supported without FW control.\n");
+        return FLINT_FAILED;
+    }
+    const char *imgTypeStr = fwImgTypeToStr(_devInfo.fw_type);
+    vector<u_int8_t> componentBuffer;
+    if (!readFromFile(_flintParams.image, componentBuffer)) {
+        return FLINT_FAILED;
+    }
+    updateBurnParams();
+    bool res = _fwOps->FwBurnAdvanced(componentBuffer, _burnParams, FwComponent::COMPID_CONGESTION_CONTROL);
+    if (!res) {
+        reportErr(true, FLINT_FSX_BURN_ERROR, imgTypeStr, _fwOps->err());
+        return FLINT_FAILED;
+    }
+
+    return FLINT_SUCCESS;
+}
+
+
 FlintStatus BurnSubCommand::burnMFA2()
 {
 #ifndef NO_MSTARCHIVE

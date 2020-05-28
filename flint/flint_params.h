@@ -150,6 +150,7 @@ public:
     bool pubkey_specified;
     string privkey_file;
     string pubkey_file;
+
     bool uuid_specified;
     string privkey_uuid;
     bool privkey2_specified;
@@ -164,6 +165,8 @@ public:
     bool use_latest_fw_version;
     string psid;
     bool use_psid;
+    bool congestion_control;
+    string congestion_control_param;
 };
 
 #endif

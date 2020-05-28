@@ -31,8 +31,10 @@
  */
 
 #include "fsctrl_ops.h"
+
 #include <tools_utils.h>
 #include <bit_slice.h>
+
 #include <vector>
 
 bool FsCtrlOperations::unsupportedOperation()
@@ -193,7 +195,6 @@ bool FsCtrlOperations::FsIntQuery()
     strncpy(_fsCtrlImgInfo.image_vsd, fwQuery.imageVsd, VSD_LEN);
     return true;
 }
-
 
 bool FsCtrlOperations::FwReactivateImage()
 {
@@ -391,10 +392,12 @@ bool FsCtrlOperations::VerifyAllowedParams(ExtBurnParams &burnParams, bool isSec
     return true;
 }
 
-bool FsCtrlOperations::FwBurnAdvanced(std::vector <u_int8_t> imageOps4MData, ExtBurnParams& burnParams)
+
+bool FsCtrlOperations::FwBurnAdvanced(std::vector <u_int8_t> imageOps4MData, ExtBurnParams& burnParams, FwComponent::comps_ids_t ComponentId)
 {
-    return _Burn(imageOps4MData, burnParams);
+    return _Burn(imageOps4MData, burnParams, ComponentId);
 }
+
 bool FsCtrlOperations::FwBurnAdvanced(FwOperations *imageOps, ExtBurnParams &burnParams)
 {
     if (imageOps == NULL) {
@@ -404,7 +407,6 @@ bool FsCtrlOperations::FwBurnAdvanced(FwOperations *imageOps, ExtBurnParams &bur
         return false;
     }
     fw_info_t fw_query;
-
     memset(&fw_query, 0, sizeof(fw_info_t));
     if (!imageOps->FwQuery(&fw_query, true)) {
         return errmsg(FwCompsErrToFwOpsErr(_fwCompsAccess->getLastError()), "Failed to query the image\n");
@@ -427,7 +429,7 @@ bool FsCtrlOperations::FwBurnAdvanced(FwOperations *imageOps, ExtBurnParams &bur
     }
     // Check TimeStamp
     if (!TestAndSetTimeStamp(imageOps)) {
-       return false;
+        return false;
     }
     std::vector <u_int8_t> imageOps4MData;
     if (!imageOps->FwExtract4MBImage(imageOps4MData, true)) {
@@ -436,7 +438,7 @@ bool FsCtrlOperations::FwBurnAdvanced(FwOperations *imageOps, ExtBurnParams &bur
     return _Burn(imageOps4MData, burnParams);
 }
 
-bool FsCtrlOperations::_Burn(std::vector <u_int8_t> imageOps4MData, ExtBurnParams& burnParams)
+bool FsCtrlOperations::_Burn(std::vector <u_int8_t> imageOps4MData, ExtBurnParams& burnParams, FwComponent::comps_ids_t ComponentId)
 {
 #ifdef UEFI_BUILD
     burnParams.ProgressFuncAdv.uefi_func =  burnParams.progressFunc;
@@ -446,7 +448,7 @@ bool FsCtrlOperations::_Burn(std::vector <u_int8_t> imageOps4MData, ExtBurnParam
     FwComponent bootImageComponent;
     std::vector<FwComponent> compsToBurn;
 
-    bootImageComponent.init(imageOps4MData, imageOps4MData.size(), FwComponent::COMPID_BOOT_IMG);
+    bootImageComponent.init(imageOps4MData, imageOps4MData.size(), ComponentId);
     compsToBurn.push_back(bootImageComponent);
     if (!_fwCompsAccess->lock_flash_semaphore()) {
         return errmsg(FwCompsErrToFwOpsErr(_fwCompsAccess->getLastError()), "%s", _fwCompsAccess->getLastErrMsg());
@@ -458,6 +460,7 @@ bool FsCtrlOperations::_Burn(std::vector <u_int8_t> imageOps4MData, ExtBurnParam
     _fwCompsAccess->unlock_flash_semaphore();
     return true;
 }
+
 
 bool FsCtrlOperations::FwBurnBlock(FwOperations *imageOps, ProgressCallBack progressFunc)
 {
@@ -761,6 +764,7 @@ bool FsCtrlOperations::FwQueryTimeStamp(struct tools_open_ts_entry& timestamp, s
     delete tsObj;
     return rc ? false : true;
 }
+
 bool FsCtrlOperations::GetSecureBootInfo()
 {
     return _signatureMngr->GetSecureBootInfo();

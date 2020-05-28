@@ -31,6 +31,7 @@
  */
 
 
+
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
@@ -915,13 +916,13 @@ bool FwOperations::writeImageEx(ProgressCallBackEx progressFuncEx, void *progres
             if(last_percent != curr_percent) {
                 last_percent = curr_percent;
                 if (progressFunc != NULL && progressFunc((int)curr_percent)) {
-                return errmsg("Aborting... received interrupt signal");
-            }
+                    return errmsg("Aborting... received interrupt signal");
+                }
                 if (progressFuncEx != NULL && progressFuncEx((int)curr_percent, progressUserData)) {
-                return errmsg("Aborting... received interrupt signal");
+                    return errmsg("Aborting... received interrupt signal");
+                }
             }
         }
-    }
     }
     return true;
 } //  Flash::WriteImage
@@ -1851,10 +1852,12 @@ bool FwOperations::GetSecureBootInfo()
 {
     return errmsg("Operation not supported.");
 }
-bool FwOperations::FwBurnAdvanced(std::vector <u_int8_t> imageOps4MData, ExtBurnParams& burnParams)
+
+bool FwOperations::FwBurnAdvanced(std::vector <u_int8_t> imageOps4MData, ExtBurnParams& burnParams, FwComponent::comps_ids_t ComponentId)
 {
     (void)imageOps4MData;
     (void)burnParams;
+    (void)ComponentId;
     return errmsg("Operation not supported.");
 }
 
@@ -1875,7 +1878,6 @@ bool FwOperations::Fs3UpdateSection(void *new_info, fs3_section_t sect_type, boo
     (void)callBackFunc;
     return errmsg("Operation not supported.");
 }
-
 bool FwOperations::FwQueryTimeStamp(struct tools_open_ts_entry& timestamp, struct tools_open_fw_version& fwVer, bool queryRunning)
 {
     (void)timestamp;
@@ -1950,7 +1952,6 @@ bool FwOperations::RestoreDevToc(vector<u_int8_t>& img, char* psid, dm_dev_id_t 
     (void)base_mac;
     return errmsg("Operation not supported");
 }
-
 
 bool FwOperations::FwSetPublicKeys(char *fname, PrintCallBack callBackFunc)
 {
@@ -2118,6 +2119,7 @@ cleanup:
     delete devTsObj;
     return retRc;
 }
+
 FwVersion FwOperations::createFwVersion(u_int16_t fw_ver0, u_int16_t fw_ver1, u_int16_t fw_ver2) {
     return FwVersion(fw_ver0, fw_ver1, fw_ver2);
 }
