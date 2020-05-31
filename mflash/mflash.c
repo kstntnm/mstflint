@@ -55,7 +55,9 @@
 #include "mflash.h"
 #include "flash_int_defs.h"
 #include "mflash_dev_capability.h"
-
+#include "mflash_common_structs.h"
+#include "mflash_gw.h"
+#include "mflash_new_gw.h"
 #define ICMD_MAX_BLOCK_WRITE   128
 #define INBAND_MAX_BLOCK_WRITE 32
 
@@ -285,7 +287,7 @@ int mf_secure_host_op(mflash *mfl, u_int64_t key, int op);
 // The retry_delay*num_of_retries is set according to the slowest flash maximum AC timing.
 //
 // To test there's no performance degradation by these delay: set DELAYS to 0 and RETRIES to infinity, and compare perf.
-
+/*
 enum FlashConstant {
     // All time values are in usecs
     WRITE_BLOCK_INIT_DELAY = 10,
@@ -322,7 +324,7 @@ enum FlashConstant {
     BP_4TH_BIT_OFFSET_MICRON = 6,
     BP_SIZE = 3,
     PROTECT_BITS_SIZE = 5
-};
+};*/
 
 enum IntelFlashCommand {
     FC_ReadID = 0x90,
@@ -1089,7 +1091,7 @@ int read_chunks(mflash *mfl, u_int32_t addr, u_int32_t len, u_int8_t *data, bool
 //
 // Relevant CR addresses, Bit offset and bit size
 //
-
+/*
 enum CrConstans {
     CR_FLASH_GW = 0xf0400,
     CR_FLASH_ADDR = 0xf0404,
@@ -1113,7 +1115,7 @@ enum CrConstans {
     BS_SPI_CMD = 8,
     BO_SPI_GPIO = 25,
     BS_SPI_GPIO = 4
-};
+};*/
 
 int gw_wait_ready(mflash *mfl, const char *msg)
 {
@@ -1145,7 +1147,7 @@ int empty_reset(mflash *mfl)
 // ConnectX functions implementation
 //
 //////////////////////////////////////////
-enum CntxCrConstants {
+/*enum CntxCrConstants {
     HCR_FLASH_CMD = 0xf0400,
     HCR_FLASH_ADDR = 0xf0404,
 
@@ -1186,7 +1188,7 @@ enum CntxCrConstants {
 
     HBO_GPIO_CS = 25,
     HBS_GPIO_CS = 4
-};
+};*/
 
 int empty_set_bank(mflash *mfl, u_int32_t bank)
 {
@@ -2226,6 +2228,58 @@ int release_semaphore(mflash *mfl, int ignore_writer_lock)
     return MFE_OK;
 }
 
+int gen6_flash_init_com(mflash *mfl, flash_params_t *flash_params, u_int8_t init_cs_support)
+{
+    int rc = 0;
+
+    //TODO: Enable page_read (slightly better perf)
+    mfl->f_read = read_chunks;
+    mfl->f_read_blk = cntx_st_spi_block_read;//need fix
+    mfl->f_set_bank = empty_set_bank;
+    mfl->f_get_info = cntx_get_flash_info;//need fix
+
+    if (init_cs_support) {
+        // Update the chip_select_support according to the banks number of cs.
+        rc = sx_init_cs_support(mfl);
+        CHECK_RC(rc);
+    }
+
+    mfl->f_spi_status = cntx_st_spi_get_status;//need fix
+    mfl->supp_sr_mod = 1;
+    rc = st_spi_fill_attr(mfl, flash_params);
+    CHECK_RC(rc);
+
+    if (mfl->attr.command_set == MCS_STSPI || mfl->attr.command_set == MCS_SSTSPI) {
+        mfl->f_reset = empty_reset; // Null func
+        mfl->f_write_blk = get_write_blk_func(mfl->attr.command_set);
+        mfl->attr.page_write = 256;
+        mfl->f_write = write_chunks;
+        mfl->f_erase_sect = cntx_st_spi_erase_sect;
+    }
+    else {
+        return MFE_UNSUPPORTED_FLASH_TYPE;
+    }
+
+    // flash parameter access methods:
+    mfl->f_get_quad_en = mf_get_quad_en_direct_access;
+    mfl->f_set_quad_en = mf_set_quad_en_direct_access;
+    mfl->f_get_dummy_cycles = mf_get_dummy_cycles_direct_access;
+    mfl->f_set_dummy_cycles = mf_set_dummy_cycles_direct_access;
+    mfl->f_get_write_protect = mf_get_write_protect_direct_access;
+    mfl->f_set_write_protect = mf_set_write_protect_direct_access;
+
+    mfl->f_st_spi_erase_sect = new_gw_st_spi_erase_sect;
+    mfl->f_int_spi_get_status_data = new_gw_int_spi_get_status_data;
+    mfl->f_st_spi_block_write_ex = new_gw_st_spi_block_write_ex;
+    mfl->f_sst_spi_block_write_ex = new_gw_sst_spi_block_write_ex;
+    mfl->f_st_spi_block_read_ex = new_gw_st_spi_block_read_ex;
+    mfl->f_spi_write_status_reg = new_gw_spi_write_status_reg;
+
+
+
+    rc = mfl->f_reset(mfl);
+    return MFE_OK;
+}
 // ConnectX and Is4 flash interfaces are identical (except lock function)
 // Use same functions
 //
@@ -2291,6 +2345,12 @@ int sx_flash_init_direct_access(mflash *mfl, flash_params_t *flash_params)
 {
     mfl->f_lock = is4_flash_lock;
     return gen4_flash_init_com(mfl, flash_params, 1);
+}
+
+int sixth_gen_init_direct_access(mflash *mfl, flash_params_t *flash_params)
+{
+    mfl->f_lock = connectib_flash_lock;
+    return gen6_flash_init_com(mfl, flash_params, 0);
 }
 
 int fifth_gen_init_direct_access(mflash *mfl, flash_params_t *flash_params)
@@ -2516,6 +2576,29 @@ int tools_cmdif_init(mflash *mfl)
     return MFE_OK;
 }
 
+int six_gen_flash_init(mflash *mfl, flash_params_t *flash_params)
+{
+    int rc = 0;
+    u_int8_t needs_cache_replacement = 0;
+
+    rc = check_cache_replacement_guard(mfl, &needs_cache_replacement);
+    CHECK_RC(rc);
+
+    if (needs_cache_replacement) {
+        if (mfl->opts[MFO_FW_ACCESS_TYPE_BY_MFILE] == ATBM_ICMD) {
+            rc = icmd_init(mfl);
+            CHECK_RC(rc);
+        }
+        rc = flash_init_fw_access(mfl, flash_params);
+        CHECK_RC(rc);
+    }
+    else {
+        rc = sixth_gen_init_direct_access(mfl, flash_params);
+        CHECK_RC(rc);
+    }
+    return MFE_OK;
+}
+
 int fifth_gen_flash_init(mflash *mfl, flash_params_t *flash_params)
 {
     int rc = 0;
@@ -2676,6 +2759,7 @@ int get_dev_info(mflash *mfl)
     u_int32_t dev_flags = 0;
     u_int32_t access_type = 0;
     int rc = 0;
+    int is7NmSuppported;
     u_int32_t dev_id = 0;
     mfl->opts[MFO_FW_ACCESS_TYPE_BY_MFILE] = ATBM_NO;
     rc = mget_mdevs_flags(mfl->mf, &dev_flags);
@@ -2684,7 +2768,7 @@ int get_dev_info(mflash *mfl)
     CHECK_RC(rc);
 
     MfError status;
-    int icmdif_supported = is_icmdif_supported(mfl, &status);
+    int icmdif_supported = is_icmdif_supported(mfl, &status, &is7NmSuppported);
     if (status != MFE_OK) {
         return status;
     }
@@ -2778,9 +2862,9 @@ int mf_open_fw(mflash *mfl, flash_params_t *flash_params, int num_of_banks)
         mfl->opts[MFO_NUM_OF_BANKS] = spi_get_num_of_flashes(num_of_banks);
         rc = spi_update_num_of_banks(mfl, num_of_banks);
         CHECK_RC(rc);
-
+        int is7NmSuppported = 0;
         MfError status;
-        int icmdif_supported = is_icmdif_supported(mfl, &status);
+        int icmdif_supported = is_icmdif_supported(mfl, &status, &is7NmSuppported);
         if (status != MFE_OK) {
             return status;
         }
@@ -2792,7 +2876,12 @@ int mf_open_fw(mflash *mfl, flash_params_t *flash_params, int num_of_banks)
         } else if (IS_SX(mfl->attr.hw_dev_id)) {
             rc = sx_flash_init(mfl, flash_params);
         } else if (icmdif_supported) {
-            rc = fifth_gen_flash_init(mfl, flash_params);
+            if (!is7NmSuppported) {
+                rc = fifth_gen_flash_init(mfl, flash_params);
+            }
+            else {
+                rc = six_gen_flash_init(mfl, flash_params);
+            }
         } else if (mfl->attr.hw_dev_id == 0xffff) {
             rc = MFE_HW_DEVID_ERROR;
         } else {
@@ -3251,6 +3340,7 @@ int mf_set_reset_flash_on_warm_reboot(mflash *mfl)
         break;
     case DeviceConnectX6:
     case DeviceConnectX6DX:
+    case DeviceConnectX6LX:
     case DeviceBlueField2:
     case DeviceSpectrum2:
     case DeviceSpectrum3:
@@ -3295,6 +3385,7 @@ int mf_update_boot_addr(mflash *mfl, u_int32_t boot_addr)
         break;
     case DeviceConnectX6:
     case DeviceConnectX6DX:
+    case DeviceConnectX6LX:
     case DeviceQuantum:
     case DeviceBlueField2:
     case DeviceSpectrum2:
@@ -3620,7 +3711,8 @@ int mf_get_write_protect_direct_access(mflash *mfl, u_int8_t bank_num,
 int mf_is_fifth_gen(mflash *mfl)
 {
     MfError status;
-    int icmdif_supported = is_icmdif_supported(mfl, &status);
+    int is7NmSuppported = 0;
+    int icmdif_supported = is_icmdif_supported(mfl, &status, &is7NmSuppported);
     if (status != MFE_OK) {
         return status;
     }

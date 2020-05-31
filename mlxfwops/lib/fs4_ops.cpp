@@ -1533,6 +1533,17 @@ bool Fs4Operations::BurnFs4Image(Fs4Operations &imageOps,
         case CT_CONNECTX6:
             getExtendedHWPtrs((VerifyCallBack)NULL, imageOps._ioAccess, true);
             break;
+/*  cannot port getExtendedHWAravaPtrs() from MFT because it requires
+    porting internal HW structures definitions 
+        case CT_CONNECTX6DX:
+            getExtendedHWAravaPtrs((VerifyCallBack)NULL, imageOps._ioAccess, true);
+            break;  */
+        case CT_BLUEFIELD:
+            if (!_signatureMngr->AddSignature(_ioAccess->getMfileObj(), &imageOps, f, 0)) {
+                return false;
+            }
+            IsUpdateSignatures = false;//already updated right now
+            break;
         default:
             IsUpdateSignatures = false;
             break;

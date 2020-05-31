@@ -28,54 +28,25 @@
  * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
+ *
+*/
+
+/*
+ * mflash_gw.h
+ *
+ *  Created on: Jul 8, 2020
+ *      Author: edwardg
  */
 
-#ifndef USER_MFLASH_FLASH_INT_DEFS_H_
-#define USER_MFLASH_FLASH_INT_DEFS_H_
 
-#define SST_FLASH_NAME   "SST25VFxx"
-#define WINBOND_NAME     "W25QxxBV"
-#define WINBOND_W25X     "W25Xxx"
-#define WINBOND_3V_NAME  "W25Qxxx"
-#define ATMEL_NAME       "AT25DFxxx"
-#define S25FLXXXP_NAME   "S25FLXXXP"
-#define S25FL116K_NAME   "S25FL11xx"
-#define MACRONIX_NAME    "MX25L16xxx"
-#define MACRONIX_3V_NAME "MX25Lxxx"
-#define CYPRESS_3V_NAME  "S25FLxxx"
-#define ISSI_3V_NAME     "IS25LPxxx"
-#define MICRON_3V_NAME   "MT25QLxxx"
-#define MACRONIX_1V8_NAME "MX25Uxxx"
-
-typedef enum flash_vendor {
-    FV_ST = 0x20,
-    FV_SST = 0xbf,
-    FV_WINBOND = 0xef,
-    FV_ATMEL = 0x1f,
-    FV_S25FLXXXX = 0x01,
-    FV_MX25K16XXX = 0xc2,
-    FV_IS25LPXXX = 0x9d
-} flash_vendor_t;
-
-typedef enum flash_memory_type {
-    FMT_ST_M25P = 0x20,
-    FMT_MX25K16XXX = 0x20,
-    FMT_ST_M25PX = 0x71,
-    FMT_SST_25 = 0x25,
-    FMT_WINBOND = 0x40,
-    FMT_WINBOND_W25X = 0x30,
-    FMT_WINBOND_3V = 0x70,
-    FMT_ATMEL = 0x2,
-    FMT_N25QXXX = 0xba,
-    FMT_S25FLXXXP = 0x02,
-    FMT_S25FL116K = 0x40,
-    FMT_S25FLXXXL = 0x60,
-    FMT_MT25QLXXXABA = 0xba,
-    FMT_IS25LPXXX = 0x60
-} flash_memory_type_t;
-
-typedef enum flash_densities {
-    FD_8 = 0x14, FD_16 = 0x15, FD_32 = 0x16, FD_64 = 0x17, FD_128 = 0x18, FD_256 = 0x19, FD_512 = 0x1a
-} flash_densities_t;
-
-#endif /* USER_MFLASH_FLASH_INT_DEFS_H_ */
+#ifndef _MFLASH_NEW_GW_H_
+#define _MFLASH_NEW_GW_H_
+#include "mflash_pack_layer.h"
+// ConnectX SPI interface:
+int new_gw_st_spi_erase_sect(mflash *mfl, u_int32_t addr);
+int new_gw_int_spi_get_status_data(mflash *mfl, u_int8_t op_type, u_int32_t *status, u_int8_t data_num);
+int new_gw_st_spi_block_write_ex(mflash *mfl, u_int32_t blk_addr, u_int32_t blk_size, u_int8_t *data, u_int8_t is_first, u_int8_t is_last, u_int32_t total_size);
+int new_gw_sst_spi_block_write_ex(mflash *mfl, u_int32_t blk_addr, u_int32_t blk_size, u_int8_t *data);
+int new_gw_st_spi_block_read_ex(mflash *mfl, u_int32_t blk_addr, u_int32_t blk_size, u_int8_t *data, u_int8_t is_first, u_int8_t is_last, bool verbose);
+int new_gw_spi_write_status_reg(mflash *mfl, u_int32_t status_reg, u_int8_t write_cmd, u_int8_t bytes_num);
+#endif
